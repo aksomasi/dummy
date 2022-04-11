@@ -1,37 +1,135 @@
-Slide - 1
--------------
-Before knowing about the Kinesis, you should know about the streaming data.
 
-What is streaming data?
-Streaming data is data which is generated continuously from thousands of data sources, and these data sources can send the data records simultaneously and in small size.
+	@PostMapping(value = "/validateAddress")
+	   public ResponseEntity<?> validateAddress(@RequestBody  AddressValidationRequest
+	     request) {
+		 boolean isValid = true;
+		 String mycountry = "";
+		 int size = 0;
+		 String error_message = "";
+		 
+		 try {
 
-Following are the examples of streaming data:
-Purchases from online stores
-People buying stuff on amazon.com and generates streaming data and that streaming data can be transactions, product, etc.
-Stock prices
-Stock price is also an example of streaming data.
-Game data
-Suppose the user is playing an angry bird game and the application is generating streaming data back to the central server. This streaming data could be "what the user is doing", "what is the score".
-Social network data
-Social network data is also another example of streaming data. Suppose you visit on Facebook, update your status, and put a post on your friend's wall. All these data would then be streamed.
-Geospatial data
-When you are using uber, and your device is connected to the internet. Uber application is constantly saying that where the uber driver is, where you are, and it is interrogating the map to give you the best possible route to your destination. This is also a good example of streaming data.
-iOT Sensor Data
-It senses the all around world monitoring temperature.
+	    		DataQualityServiceStub service = new DataQualityServiceStub(PropertyLibrary.check_address_web_service_url);
+	    		CleanAddressRequest cRequest = new CleanAddressRequest();
+	    		CleanAddressResponse resp = null;
+	    		DQAddress address = new DQAddress();
+	    		address.setCity(request.getCity());
+	    		address.setStateProvince(request.getState());
+	    		address.setZipCode(request.getZip());
+	    		address.setLine1(request.getStreetln1());
+	    		if (null != streetln2)
+	    			address.setLine2(request.getStreetln2());
+	    		address.setCountry(request.getCountry());
+	    		cRequest.setAddress(address);
+	    		cRequest.setNumSuggestions(2);
+	    		cRequest.setIsTest(false);
+	    		// Axis Wrappers
+	    		DataQualityServiceStub.Execute exe = new DataQualityServiceStub.Execute();
+	    		exe.setRequest(cRequest);
+	    		ExecuteResponse exeResp = service.execute(exe);
 
+	    		// Cast the generic DataQualityResponse to expected response.
+	    		resp = (CleanAddressResponse) exeResp.getExecuteResult();
 
-Slide -2
----------------
-AWS Kinesis
+	    		if ( resp != null && resp.getError() != null && null == resp.getError().getMessage()) {
+	    			isValid = true;
+	    		} else {
+	    			if ( resp != null && resp.getError() != null && resp.getError().getMessage().indexOf("addresses found") > 0) {
+	    				isValid = false;
+	    				
+	    			}
+	    			if (resp != null && resp.getError() != null && resp.getError().getMessage()
+	    					.indexOf("no active subscriptions") > 0) {
+	    				isValid = false;
 
-Slide -3
----------------
-Architecture of Kinesis Stream
-Suppose we have got the EC2, mobile phones, Laptops, IOT which are producing the data. They are known as producers as they produce the data. The data is moved to the Kinesis streams and stored in the shard. By default, the data is stored in shards for 24 hours. You can increase the time to 7 days of retention. Once the data is stored in shards, then you have EC2 instances which are known as consumers. They take the data from shards and turned it into useful data. Once the consumers have performed its calculation, then the useful data is moved to either of the AWS services, i.e., DynamoDB, S3, EMR, Redshift.
+	    			} 
+	    			if (null == resp.getError()) {
+	    				isValid = false;
 
-Slid - 4
--------------
-Suppose you have got the EC2, mobile phones, Laptop, IOT which are producing the data. They are also known as producers. Producers send the data to Kinesis Firehose. Kinesis Firehose does not have to manage the resources such as shards, you do not have to worry about streams, you do not have to worry about manual editing the shards to keep up with the data, etc. It?s completely automated. You do not have to worry even about the consumers. Data can be analyzed by using a Lambda function. Once the data has been analyzed, the data is sent directly over to the S3. The analytics of data is optional. One important thing about Kinesis Firehouse is that there is no automatic retention window, but the Kinesis stream has an automatic retention window whose default time is 24 hours and it can be extended up to 7 days. Kinesis Firehose does not work like this. It essentially either analyzes or sends the data over directly to S3 or other location.
+	    			} else {
+	    				size = resp.getNumSuggestions();
+	    			}
 
-The other location can be Redshift. First, you have to write to S3 and then copy it to the Redshift.
+	    		}
+	    		
+	    		if (resp.getAddresses() != null && resp.getAddresses().getDQAddress() == null) {
+	    			isValid = false;
+	    		}
+	    		
+	    		 if ( ! resp.getIsZipValid())
+	    		 {
+	    			 error_message = "The zip code is not valid" ;
+	    		 }
+	    	
+	    		if (isValid) {
+	    			
+	    			mycountry = resp.getAddresses().getDQAddress()[0].getCountry();
 
+	    			if ( mycountry != null )
+	    				mycountry = mycountry.toUpperCase().trim()  ;
+	    			else
+	    				mycountry = "";
+	    		//	if ( mycountry.trim().length() == 0  )
+	    		//		mycountry = "United States";
+	    				
+	    			String address2 = resp.getAddresses().getDQAddress()[0].getLine2()==null ? "": resp.getAddresses().getDQAddress()[0].getLine2();
+	    			}
+
+	    		} catch(AxisFault e) {
+	    		isValid = false;
+	    		e.printStackTrace();
+	    		System.out.println(e);
+	    	}
+
+	return ResponseEntity.ok("Saved data into Kinessis sucessfully!");
+}
+
+////////////////
+public class AddressValidationRequest {
+
+	private String streetln1;
+	private String streetln2;
+	private String city;
+	private String state;
+	private String zip;
+	private String country;
+	
+	public String getStreetln1() {
+		return streetln1;
+	}
+	public void setStreetln1(String streetln1) {
+		this.streetln1 = streetln1;
+	}
+	public String getStreetln2() {
+		return streetln2;
+	}
+	public void setStreetln2(String streetln2) {
+		this.streetln2 = streetln2;
+	}
+	public String getCity() {
+		return city;
+	}
+	public void setCity(String city) {
+		this.city = city;
+	}
+	public String getState() {
+		return state;
+	}
+	public void setState(String state) {
+		this.state = state;
+	}
+	public String getZip() {
+		return zip;
+	}
+	public void setZip(String zip) {
+		this.zip = zip;
+	}
+	public String getCountry() {
+		return country;
+	}
+	public void setCountry(String country) {
+		this.country = country;
+	}
+	
+	
+}
